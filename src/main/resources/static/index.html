@@ -4,6 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <meta name="description" content="映画・ドラマの配信先と視聴記録をひとつにまとめるWatchlog">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='16' fill='%23171713'/%3E%3Ctext x='32' y='44' text-anchor='middle' font-size='38' font-family='sans-serif' font-weight='700' fill='%23dfff48'%3EW%3C/text%3E%3C/svg%3E">
   <title>Watchlog — 観たもの、観たいもの。</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -32,7 +33,7 @@
       <div class="hero">
         <div class="eyebrow"><span></span> YOUR CINEMA JOURNAL</div>
         <h1>観たもの、<br><em>観たいもの。</em></h1>
-        <p>映画とドラマの配信先を見つけて、あなただけの視聴記録を育てよう。</p>
+        <p>映画・ドラマ・アニメの配信先を見つけて、あなただけの視聴記録を育てよう。</p>
         <div class="hero-stats">
           <div><strong id="workCount">0</strong><span>登録作品</span></div>
           <div><strong id="serviceCount">0</strong><span>配信サービス</span></div>
@@ -43,11 +44,11 @@
       <div class="content-shell">
         <div class="section-heading">
           <div><span class="kicker">LIBRARY</span><h2>作品ライブラリ</h2></div>
-          <button class="button primary with-icon" data-action="new-work"><span>＋</span> 作品を登録</button>
+          <div class="heading-actions"><button class="button ghost" data-action="open-tmdb">TMDBから追加</button><button class="button primary with-icon" data-action="new-work"><span>＋</span> 作品を登録</button></div>
         </div>
         <div class="filterbar">
           <label class="search-box"><span>⌕</span><input id="searchInput" type="search" placeholder="作品名・ジャンル・監督で検索"></label>
-          <select id="typeFilter" aria-label="作品種別"><option value="">すべての種別</option><option value="MOVIE">映画</option><option value="DRAMA">ドラマ</option></select>
+          <select id="typeFilter" aria-label="作品種別"><option value="">すべての種別</option><option value="MOVIE">映画</option><option value="DRAMA">ドラマ</option><option value="ANIME">アニメ</option></select>
           <select id="yearFilter" aria-label="公開年"><option value="">すべての公開年</option></select>
         </div>
         <div id="workGrid" class="work-grid" aria-live="polite"></div>
@@ -73,6 +74,8 @@
       <div id="serviceGrid" class="service-grid"></div>
     </section>
   </main>
+
+  <footer class="credits"><strong>DATA & IMAGES</strong><p>This product uses the TMDB API but is not endorsed or certified by TMDB.</p><p>配信情報は <a href="https://www.justwatch.com/jp" target="_blank" rel="noopener">JustWatch</a> 提供データを利用しています。</p></footer>
 
   <dialog id="detailDialog" class="dialog detail-dialog"><div id="detailContent"></div></dialog>
   <dialog id="formDialog" class="dialog form-dialog"><div id="formContent"></div></dialog>

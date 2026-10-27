@@ -3,7 +3,7 @@ const $ = (selector, root = document) => root.querySelector(selector);
 const $$ = (selector, root = document) => [...root.querySelectorAll(selector)];
 
 const labels = {
-  MOVIE: '映画', DRAMA: 'ドラマ',
+  MOVIE: '映画', DRAMA: 'ドラマ', ANIME: 'アニメ',
   SUBSCRIPTION: '見放題', RENTAL: 'レンタル', PURCHASE: '購入',
   UNWATCHED: '未視聴', WATCHING: '視聴中', WATCHED: '視聴済み'
 };
@@ -49,7 +49,9 @@ async function initialize() {
     state.user = user;
     if (user) await loadHistories();
     renderAll();
-  } catch (error) { toast(error.message, true); }
+  } catch (error) {
+    toast(error.message, true);
+  }
 }
 
 async function refreshCatalog() {
@@ -176,7 +178,9 @@ async function submitAuth(event) {
     $('#authDialog').close();
     renderAll();
     toast(`${state.user.name}さん、ようこそ`);
-  } catch (error) { toast(error.message, true); }
+  } catch (error) {
+    toast(error.message, true);
+  }
 }
 
 function workForm(work = null) {
@@ -186,7 +190,7 @@ function workForm(work = null) {
     <form id="workForm" class="stack-form">
       <label>作品名<input name="title" maxlength="200" required value="${escapeHtml(work?.title || '')}"></label>
       <label>あらすじ<textarea name="description" maxlength="4000" required>${escapeHtml(work?.description || '')}</textarea></label>
-      <div class="form-row"><label>作品種別<select name="type"><option value="MOVIE" ${work?.type === 'MOVIE' ? 'selected' : ''}>映画</option><option value="DRAMA" ${work?.type === 'DRAMA' ? 'selected' : ''}>ドラマ</option></select></label>
+      <div class="form-row"><label>作品種別<select name="type"><option value="MOVIE" ${work?.type === 'MOVIE' ? 'selected' : ''}>映画</option><option value="DRAMA" ${work?.type === 'DRAMA' ? 'selected' : ''}>ドラマ</option><option value="ANIME" ${work?.type === 'ANIME' ? 'selected' : ''}>アニメ</option></select></label>
       <label>公開年<input name="releaseYear" type="number" min="1000" max="9999" required value="${work?.releaseYear || new Date().getFullYear()}"></label></div>
       <div class="form-row"><label>ジャンル<input name="genre" maxlength="100" required value="${escapeHtml(work?.genre || '')}"></label><label>監督名（任意）<input name="director" maxlength="150" value="${escapeHtml(work?.director || '')}"></label></div>
       <label>ポスター画像URL（任意）<input name="imageUrl" type="url" value="${escapeHtml(work?.imageUrl || '')}" placeholder="https://example.com/poster.jpg"></label>
@@ -237,11 +241,41 @@ function serviceForm(service = null) {
   $('#formDialog').showModal();
 }
 
+async function tmdbImportDialog() {
+  $('#formContent').innerHTML = `<button class="dialog-close" data-action="close-dialog" aria-label="閉じる">×</button>
+    <div class="dialog-head"><span class="kicker">DISCOVER WITH TMDB</span><h2>作品を検索して追加</h2><p class="dialog-copy">TMDBから作品情報・ポスター・日本の配信情報を取り込みます。</p></div>
+    <form id="tmdbSearchForm" class="tmdb-search"><input name="query" required maxlength="100" placeholder="作品名を入力"><select name="type"><option value="">すべて</option><option value="MOVIE">映画</option><option value="DRAMA">ドラマ</option><option value="ANIME">アニメ</option></select><button class="button primary" type="submit">検索</button></form>
+    <div id="tmdbNotice" class="integration-notice">連携状態を確認しています…</div><div id="tmdbResults" class="tmdb-results"></div>
+    <p class="attribution">This product uses the TMDB API but is not endorsed or certified by TMDB.<br>配信情報提供: JustWatch</p>`;
+  $('#formDialog').showModal();
+  try {
+    const status = await api('/api/external/tmdb/status');
+    $('#tmdbNotice').innerHTML = status.configured ? 'TMDBに接続できます。作品名で検索してください。' : '<strong>TMDBトークンが未設定です。</strong><br><code>TMDB_READ_ACCESS_TOKEN</code>を環境変数に設定して再起動してください。';
+    $('#tmdbNotice').classList.toggle('warning', !status.configured);
+  } catch (error) { $('#tmdbNotice').textContent = error.message; }
+  $('#tmdbSearchForm').addEventListener('submit', async event => {
+    event.preventDefault();
+    const values = Object.fromEntries(new FormData(event.currentTarget));
+    const results = $('#tmdbResults');
+    results.innerHTML = '<div class="loading-state">TMDBを検索しています…</div>';
+    try {
+      const params = new URLSearchParams({ query: values.query });
+      if (values.type) params.set('type', values.type);
+      const response = await api(`/api/external/tmdb/search?${params}`);
+      results.innerHTML = response.results.length ? response.results.map(item => {
+        const poster = cleanUrl(item.imageUrl);
+        return `<article class="tmdb-result"><div class="tmdb-poster">${poster ? `<img src="${escapeHtml(poster)}" alt="">` : '<span>NO IMAGE</span>'}</div><div class="tmdb-copy"><span class="status-pill">${labels[item.type]}</span><h3>${escapeHtml(item.title)}</h3><p>${item.releaseYear || '公開年不明'} ・ ${escapeHtml(item.genre)} ・ ★ ${Number(item.rating || 0).toFixed(1)}</p><small>${escapeHtml(item.overview || 'あらすじは登録されていません。')}</small></div><button class="button primary" data-action="import-tmdb" data-tmdb-id="${item.tmdbId}" data-media-type="${item.mediaType}">追加</button></article>`;
+      }).join('') : '<div class="empty-state"><h3>該当する作品がありません</h3><p>別の作品名で検索してください。</p></div>';
+    } catch (error) { results.innerHTML = `<div class="integration-notice warning">${escapeHtml(error.message)}</div>`; }
+  });
+}
+
 function showWorkDetail(work) {
   const image = cleanUrl(work.imageUrl);
   const unlinked = state.services.filter(service => !work.streamingServices.some(item => item.streamingServiceId === service.id));
   const optionRows = work.streamingServices.length ? work.streamingServices.map(option => `<div class="availability-row"><div class="service-logo">${escapeHtml(option.name.charAt(0))}</div><div><strong>${escapeHtml(option.name)}</strong><br><span>${labels[option.availabilityType]}</span></div>${option.viewingUrl ? `<a href="${escapeHtml(cleanUrl(option.viewingUrl))}" target="_blank" rel="noopener">視聴する ↗</a>` : ''}<button class="icon-button" data-action="delete-availability" data-work-id="${work.id}" data-id="${option.id}" aria-label="紐づけ解除">×</button></div>`).join('') : '<p class="dialog-copy">配信情報はまだ登録されていません。</p>';
-  $('#detailContent').innerHTML = `<button class="dialog-close" data-action="close-dialog" aria-label="閉じる">×</button><div class="detail-layout"><div class="detail-visual">${image ? `<img src="${escapeHtml(image)}" alt="${escapeHtml(work.title)}">` : `<div class="poster-placeholder">${escapeHtml([...work.title].slice(0,2).join(''))}</div>`}</div><div class="detail-body"><span class="kicker">${labels[work.type]}</span><h2>${escapeHtml(work.title)}</h2><div class="detail-meta">${work.releaseYear} ・ ${escapeHtml(work.genre)}${work.director ? ` ・ ${escapeHtml(work.director)}監督` : ''}</div><p class="detail-description">${escapeHtml(work.description)}</p><div class="detail-actions"><button class="button primary" data-action="record-work" data-id="${work.id}">視聴記録に追加</button><button class="button soft" data-action="edit-work" data-id="${work.id}">作品を編集</button><button class="button danger" data-action="delete-work" data-id="${work.id}">削除</button></div><h3 class="subheading">視聴できるサービス</h3><div class="availability-list">${optionRows}</div>${unlinked.length ? `<form id="availabilityForm" class="add-availability"><select name="streamingServiceId">${unlinked.map(service => `<option value="${service.id}">${escapeHtml(service.name)}</option>`).join('')}</select><select name="availabilityType"><option value="SUBSCRIPTION">見放題</option><option value="RENTAL">レンタル</option><option value="PURCHASE">購入</option></select><button class="button ghost" type="submit">＋ 追加</button></form>` : ''}</div></div>`;
+  const tmdbLink = work.externalSource === 'TMDB' ? `https://www.themoviedb.org/${work.externalMediaType === 'MOVIE' ? 'movie' : 'tv'}/${work.externalId}` : '';
+  $('#detailContent').innerHTML = `<button class="dialog-close" data-action="close-dialog" aria-label="閉じる">×</button><div class="detail-layout"><div class="detail-visual">${image ? `<img src="${escapeHtml(image)}" alt="${escapeHtml(work.title)}">` : `<div class="poster-placeholder">${escapeHtml([...work.title].slice(0,2).join(''))}</div>`}</div><div class="detail-body"><span class="kicker">${labels[work.type]}${work.externalSource ? ' ・ FROM TMDB' : ''}</span><h2>${escapeHtml(work.title)}</h2><div class="detail-meta">${work.releaseYear} ・ ${escapeHtml(work.genre)}${work.director ? ` ・ ${escapeHtml(work.director)}監督` : ''}</div><p class="detail-description">${escapeHtml(work.description)}</p><div class="detail-actions"><button class="button primary" data-action="record-work" data-id="${work.id}">視聴記録に追加</button><button class="button soft" data-action="edit-work" data-id="${work.id}">作品を編集</button>${tmdbLink ? `<a class="button ghost tmdb-link" href="${tmdbLink}" target="_blank" rel="noopener">TMDB ↗</a>` : ''}<button class="button danger" data-action="delete-work" data-id="${work.id}">削除</button></div><h3 class="subheading">視聴できるサービス</h3><div class="availability-list">${optionRows}</div>${unlinked.length ? `<form id="availabilityForm" class="add-availability"><select name="streamingServiceId">${unlinked.map(service => `<option value="${service.id}">${escapeHtml(service.name)}</option>`).join('')}</select><select name="availabilityType"><option value="SUBSCRIPTION">見放題</option><option value="RENTAL">レンタル</option><option value="PURCHASE">購入</option></select><button class="button ghost" type="submit">＋ 追加</button></form>` : ''}</div></div>`;
   $('#availabilityForm')?.addEventListener('submit', async event => {
     event.preventDefault(); const data = Object.fromEntries(new FormData(event.currentTarget)); data.streamingServiceId = Number(data.streamingServiceId); data.viewingUrl = state.services.find(s => s.id === data.streamingServiceId)?.serviceUrl || null;
     try { await api(`/api/works/${work.id}/streaming-services`, { method: 'POST', body: JSON.stringify(data) }); await refreshCatalog(); showWorkDetail(state.works.find(w => w.id === work.id)); toast('配信先を追加しました'); }
@@ -256,6 +290,7 @@ async function handleAction(action, target) {
   if (action === 'open-register') return openAuth('register');
   if (action === 'close-dialog') return target.closest('dialog').close();
   if (action === 'new-work') return workForm();
+  if (action === 'open-tmdb') return tmdbImportDialog();
   if (action === 'new-history') return historyForm();
   if (action === 'new-service') return serviceForm();
   if (action === 'work-detail') return showWorkDetail(state.works.find(w => w.id === id));
@@ -264,12 +299,20 @@ async function handleAction(action, target) {
   if (action === 'edit-history') return historyForm(state.histories.find(h => h.id === id));
   if (action === 'edit-service') return serviceForm(state.services.find(s => s.id === id));
   try {
+    if (action === 'import-tmdb') {
+      target.disabled = true; target.textContent = '追加中…';
+      await api('/api/external/tmdb/import', { method: 'POST', body: JSON.stringify({ tmdbId: Number(target.dataset.tmdbId), mediaType: target.dataset.mediaType }) });
+      await refreshCatalog(); target.textContent = '追加済み'; toast('TMDBから作品と配信情報を追加しました');
+    }
     if (action === 'logout') { await api('/api/auth/logout', { method: 'POST' }); state.user = null; state.histories = []; renderAll(); toast('ログアウトしました'); }
     if (action === 'delete-work' && confirm('この作品と関連する視聴記録を削除しますか？')) { await api(`/api/works/${id}`, { method: 'DELETE' }); $('#detailDialog').close(); await refreshCatalog(); if (state.user) await loadHistories(); renderAll(); toast('作品を削除しました'); }
     if (action === 'delete-history' && confirm('この視聴記録を削除しますか？')) { await api(`/api/users/${state.user.id}/viewing-histories/${id}`, { method: 'DELETE' }); await loadHistories(); renderAll(); toast('視聴記録を削除しました'); }
     if (action === 'delete-service' && confirm('このサービスと作品の紐づけを削除しますか？')) { await api(`/api/streaming-services/${id}`, { method: 'DELETE' }); await refreshCatalog(); toast('配信サービスを削除しました'); }
     if (action === 'delete-availability' && confirm('この配信情報を解除しますか？')) { const workId = Number(target.dataset.workId); await api(`/api/works/${workId}/streaming-services/${id}`, { method: 'DELETE' }); await refreshCatalog(); showWorkDetail(state.works.find(w => w.id === workId)); toast('配信情報を解除しました'); }
-  } catch (error) { toast(error.message, true); }
+  } catch (error) {
+    if (action === 'import-tmdb') { target.disabled = false; target.textContent = '再試行'; }
+    toast(error.message, true);
+  }
 }
 
 document.addEventListener('click', event => {
