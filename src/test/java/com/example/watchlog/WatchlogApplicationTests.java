@@ -88,4 +88,25 @@ class WatchlogApplicationTests {
                 .andExpect(jsonPath("$.timestamp").exists());
     }
 
+    @Test
+    void sampleCatalogIncludesAnime() throws Exception {
+        mockMvc.perform(get("/api/works"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(8))
+                .andExpect(jsonPath("$[?(@.type == 'ANIME')]").isNotEmpty());
+    }
+
+    @Test
+    void tmdbStatusAndMissingTokenAreHandled() throws Exception {
+        mockMvc.perform(get("/api/external/tmdb/status"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.configured").value(false));
+
+        mockMvc.perform(get("/api/external/tmdb/search")
+                        .param("query", "アニメ")
+                        .param("type", "ANIME"))
+                .andExpect(status().isServiceUnavailable())
+                .andExpect(jsonPath("$.code").value("TMDB_NOT_CONFIGURED"));
+    }
+
 }

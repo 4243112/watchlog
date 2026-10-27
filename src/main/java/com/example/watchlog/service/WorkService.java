@@ -106,7 +106,9 @@ public class WorkService {
         List<StreamingOptionResponse> options = availabilityRepository
                 .findByWorkIdOrderByStreamingServiceName(work.getId()).stream().map(this::toOption).toList();
         return new WorkResponse(work.getId(), work.getTitle(), work.getDescription(), work.getType(),
-                work.getReleaseYear(), work.getGenre(), work.getDirector(), work.getImageUrl(), options,
+                work.getReleaseYear(), work.getGenre(), work.getDirector(), work.getImageUrl(),
+                work.getExternalSource(), work.getExternalId(), work.getExternalMediaType(),
+                work.getExternalUpdatedAt(), options,
                 work.getCreatedAt(), work.getUpdatedAt());
     }
 

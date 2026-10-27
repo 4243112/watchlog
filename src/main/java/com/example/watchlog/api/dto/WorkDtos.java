@@ -46,6 +46,10 @@ public final class WorkDtos {
             String genre,
             String director,
             String imageUrl,
+            String externalSource,
+            Long externalId,
+            String externalMediaType,
+            LocalDateTime externalUpdatedAt,
             List<StreamingOptionResponse> streamingServices,
             LocalDateTime createdAt,
             LocalDateTime updatedAt) {}
